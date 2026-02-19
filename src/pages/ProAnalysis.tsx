@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, TrendingUp, TrendingDown, Minus, ChevronDown, ChevronUp, Shield, Target, AlertTriangle, DollarSign, BarChart3, Search } from "lucide-react";
+import { ArrowLeft, TrendingUp, TrendingDown, Minus, ChevronDown, ChevronUp, Shield, Target, AlertTriangle, DollarSign, BarChart3, Search, Newspaper } from "lucide-react";
 import { Link } from "react-router-dom";
 import { stocksData, type StockAnalysis } from "@/data/stocks";
+import NewsSection from "@/components/NewsSection";
 
 const riskColors = {
   baixo: "text-success bg-success/10 border-success/20",
@@ -193,6 +194,7 @@ const StockCard = ({ stock }: { stock: StockAnalysis }) => {
 };
 
 const ProAnalysis = () => {
+  const [tab, setTab] = useState<"analises" | "noticias">("analises");
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<string>("todos");
 
@@ -226,64 +228,90 @@ const ProAnalysis = () => {
       </div>
 
       <div className="container mx-auto px-6 py-8">
-        {/* Search & Filters */}
-        <div className="flex flex-col sm:flex-row gap-4 mb-8">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <input
-              type="text"
-              placeholder="Buscar por ticker ou nome..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-10 pr-4 py-3 rounded-xl bg-secondary border border-border text-sm focus:outline-none focus:border-primary/50 transition-colors font-mono"
-            />
-          </div>
-          <div className="flex gap-2 flex-wrap">
-            {sectors.map((s) => (
-              <button
-                key={s}
-                onClick={() => setFilter(s)}
-                className={`px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
-                  filter === s ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                {s === "todos" ? "Todos" : s}
-              </button>
-            ))}
-          </div>
+        {/* Tabs */}
+        <div className="flex gap-2 mb-8 border-b border-border pb-4">
+          <button
+            onClick={() => setTab("analises")}
+            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all ${
+              tab === "analises" ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <BarChart3 className="w-4 h-4" /> Análises (20)
+          </button>
+          <button
+            onClick={() => setTab("noticias")}
+            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all ${
+              tab === "noticias" ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <Newspaper className="w-4 h-4" /> Notícias
+          </button>
         </div>
 
-        {/* Summary stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-          {[
-            { label: "Total de Ações", value: "20", icon: BarChart3 },
-            { label: "Compra Forte", value: stocksData.filter((s) => s.recommendation === "compra forte").length.toString(), icon: TrendingUp },
-            { label: "Compra", value: stocksData.filter((s) => s.recommendation === "compra").length.toString(), icon: Target },
-            { label: "Cautela", value: stocksData.filter((s) => s.recommendation === "cautela" || s.recommendation === "neutro").length.toString(), icon: AlertTriangle },
-          ].map((stat) => (
-            <div key={stat.label} className="bg-card border border-border rounded-xl p-4 flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                <stat.icon className="w-5 h-5 text-primary" />
+        {tab === "analises" ? (
+          <>
+            {/* Search & Filters */}
+            <div className="flex flex-col sm:flex-row gap-4 mb-8">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <input
+                  type="text"
+                  placeholder="Buscar por ticker ou nome..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="w-full pl-10 pr-4 py-3 rounded-xl bg-secondary border border-border text-sm focus:outline-none focus:border-primary/50 transition-colors font-mono"
+                />
               </div>
-              <div>
-                <p className="font-mono font-bold text-lg">{stat.value}</p>
-                <p className="text-xs text-muted-foreground">{stat.label}</p>
+              <div className="flex gap-2 flex-wrap">
+                {sectors.map((s) => (
+                  <button
+                    key={s}
+                    onClick={() => setFilter(s)}
+                    className={`px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
+                      filter === s ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    {s === "todos" ? "Todos" : s}
+                  </button>
+                ))}
               </div>
             </div>
-          ))}
-        </div>
 
-        {/* Stock list */}
-        <div className="space-y-3">
-          {filtered.map((stock) => (
-            <StockCard key={stock.ticker} stock={stock} />
-          ))}
-          {filtered.length === 0 && (
-            <div className="text-center py-16 text-muted-foreground">
-              <p>Nenhuma ação encontrada.</p>
+            {/* Summary stats */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+              {[
+                { label: "Total de Ações", value: "20", icon: BarChart3 },
+                { label: "Compra Forte", value: stocksData.filter((s) => s.recommendation === "compra forte").length.toString(), icon: TrendingUp },
+                { label: "Compra", value: stocksData.filter((s) => s.recommendation === "compra").length.toString(), icon: Target },
+                { label: "Cautela", value: stocksData.filter((s) => s.recommendation === "cautela" || s.recommendation === "neutro").length.toString(), icon: AlertTriangle },
+              ].map((stat) => (
+                <div key={stat.label} className="bg-card border border-border rounded-xl p-4 flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                    <stat.icon className="w-5 h-5 text-primary" />
+                  </div>
+                  <div>
+                    <p className="font-mono font-bold text-lg">{stat.value}</p>
+                    <p className="text-xs text-muted-foreground">{stat.label}</p>
+                  </div>
+                </div>
+              ))}
             </div>
-          )}
-        </div>
+
+            {/* Stock list */}
+            <div className="space-y-3">
+              {filtered.map((stock) => (
+                <StockCard key={stock.ticker} stock={stock} />
+              ))}
+              {filtered.length === 0 && (
+                <div className="text-center py-16 text-muted-foreground">
+                  <p>Nenhuma ação encontrada.</p>
+                </div>
+              )}
+            </div>
+          </>
+        ) : (
+          <NewsSection />
+        )}
       </div>
     </div>
   );
