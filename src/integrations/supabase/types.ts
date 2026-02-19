@@ -14,6 +14,42 @@ export type Database = {
   }
   public: {
     Tables: {
+      stock_news: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          published_at: string | null
+          sentiment: string | null
+          source: string | null
+          ticker: string | null
+          title: string
+          url: string | null
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          published_at?: string | null
+          sentiment?: string | null
+          source?: string | null
+          ticker?: string | null
+          title: string
+          url?: string | null
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          published_at?: string | null
+          sentiment?: string | null
+          source?: string | null
+          ticker?: string | null
+          title?: string
+          url?: string | null
+        }
+        Relationships: []
+      }
       stock_quotes: {
         Row: {
           change_percent: number
