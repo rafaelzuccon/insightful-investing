@@ -21,8 +21,10 @@ const recColors = {
   cautela: "text-destructive bg-destructive/10",
 };
 
-const HighRiskCard = ({ stock }: { stock: StockAnalysis }) => {
+const HighRiskCard = ({ stock, livePrice, liveChange }: { stock: StockAnalysis; livePrice?: number; liveChange?: number }) => {
   const [expanded, setExpanded] = useState(false);
+  const price = livePrice ?? stock.price;
+  const change = liveChange ?? stock.change;
 
   return (
     <motion.div
@@ -49,9 +51,9 @@ const HighRiskCard = ({ stock }: { stock: StockAnalysis }) => {
         </div>
         <div className="flex items-center gap-6">
           <div className="text-right hidden sm:block">
-            <p className="font-mono font-bold">R${stock.price.toFixed(2)}</p>
-            <p className={`text-sm font-mono ${stock.change >= 0 ? "text-success" : "text-destructive"}`}>
-              {stock.change >= 0 ? "+" : ""}{stock.change}%
+            <p className="font-mono font-bold">R${price.toFixed(2)}</p>
+            <p className={`text-sm font-mono ${change >= 0 ? "text-success" : "text-destructive"}`}>
+              {change >= 0 ? "+" : ""}{change.toFixed(2)}%
             </p>
           </div>
           {expanded ? <ChevronUp className="w-5 h-5 text-muted-foreground" /> : <ChevronDown className="w-5 h-5 text-muted-foreground" />}
@@ -69,7 +71,7 @@ const HighRiskCard = ({ stock }: { stock: StockAnalysis }) => {
           >
             <div className="px-5 pb-6 space-y-6 border-t border-border pt-5">
               {/* Chart */}
-              <StockChart ticker={stock.ticker} currentPrice={stock.price} />
+              <StockChart ticker={stock.ticker} currentPrice={price} />
 
               {/* Risk warning */}
               <div className="flex items-start gap-3 p-4 rounded-xl bg-destructive/5 border border-destructive/20">
@@ -202,7 +204,9 @@ const HighRiskCard = ({ stock }: { stock: StockAnalysis }) => {
   );
 };
 
-const HighRiskSection = () => {
+type LiveQuote = { price: number; change_percent: number };
+
+const HighRiskSection = ({ liveQuotes = {} }: { liveQuotes?: Record<string, LiveQuote> }) => {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<string>("todos");
 
@@ -286,7 +290,11 @@ const HighRiskSection = () => {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: i * 0.05 }}
           >
-            <HighRiskCard stock={stock} />
+            <HighRiskCard
+              stock={stock}
+              livePrice={liveQuotes[stock.ticker]?.price}
+              liveChange={liveQuotes[stock.ticker]?.change_percent}
+            />
           </motion.div>
         ))}
         {filtered.length === 0 && (

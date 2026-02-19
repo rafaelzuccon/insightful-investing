@@ -1,11 +1,12 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, TrendingUp, TrendingDown, Minus, ChevronDown, ChevronUp, Shield, Target, AlertTriangle, DollarSign, BarChart3, Search, Newspaper, Flame } from "lucide-react";
+import { ArrowLeft, TrendingUp, TrendingDown, Minus, ChevronDown, ChevronUp, Shield, Target, AlertTriangle, DollarSign, BarChart3, Search, Newspaper, Flame, RefreshCw, Wifi } from "lucide-react";
 import { Link } from "react-router-dom";
 import { stocksData, type StockAnalysis } from "@/data/stocks";
 import NewsSection from "@/components/NewsSection";
 import HighRiskSection from "@/components/HighRiskSection";
 import StockChart from "@/components/StockChart";
+import { useLiveStockData } from "@/hooks/useLiveStockData";
 
 const riskColors = {
   baixo: "text-success bg-success/10 border-success/20",
@@ -20,8 +21,10 @@ const recColors = {
   cautela: "text-destructive bg-destructive/10",
 };
 
-const StockCard = ({ stock }: { stock: StockAnalysis }) => {
+const StockCard = ({ stock, livePrice, liveChange }: { stock: StockAnalysis; livePrice?: number; liveChange?: number }) => {
   const [expanded, setExpanded] = useState(false);
+  const price = livePrice ?? stock.price;
+  const change = liveChange ?? stock.change;
 
   return (
     <motion.div
@@ -51,9 +54,9 @@ const StockCard = ({ stock }: { stock: StockAnalysis }) => {
         </div>
         <div className="flex items-center gap-6">
           <div className="text-right hidden sm:block">
-            <p className="font-mono font-bold">R${stock.price.toFixed(2)}</p>
-            <p className={`text-sm font-mono ${stock.change >= 0 ? "text-success" : "text-destructive"}`}>
-              {stock.change >= 0 ? "+" : ""}{stock.change}%
+            <p className="font-mono font-bold">R${price.toFixed(2)}</p>
+            <p className={`text-sm font-mono ${change >= 0 ? "text-success" : "text-destructive"}`}>
+              {change >= 0 ? "+" : ""}{change.toFixed(2)}%
             </p>
           </div>
           {expanded ? <ChevronUp className="w-5 h-5 text-muted-foreground" /> : <ChevronDown className="w-5 h-5 text-muted-foreground" />}
@@ -72,7 +75,7 @@ const StockCard = ({ stock }: { stock: StockAnalysis }) => {
           >
             <div className="px-5 pb-6 space-y-6 border-t border-border pt-5">
               {/* Chart */}
-              <StockChart ticker={stock.ticker} currentPrice={stock.price} />
+              <StockChart ticker={stock.ticker} currentPrice={price} />
 
               {/* Analysis */}
               <div>
@@ -200,6 +203,7 @@ const StockCard = ({ stock }: { stock: StockAnalysis }) => {
 
 const ProAnalysis = () => {
   const [tab, setTab] = useState<"analises" | "noticias" | "riscos">("analises");
+  const { quotes, lastUpdated, loading, refreshQuotes } = useLiveStockData();
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<string>("todos");
 
@@ -212,6 +216,12 @@ const ProAnalysis = () => {
     return matchesSearch && matchesSector;
   });
 
+  const formatLastUpdated = (dateStr: string | null) => {
+    if (!dateStr) return "Nunca";
+    const d = new Date(dateStr);
+    return d.toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+  };
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -222,9 +232,22 @@ const ProAnalysis = () => {
           </Link>
           <div>
             <h1 className="font-bold font-display text-lg">Análises Pro</h1>
-            <p className="text-xs text-muted-foreground">20 ações com análise completa da I.A.</p>
+            <div className="flex items-center gap-2">
+              <Wifi className={`w-3 h-3 ${Object.keys(quotes).length > 0 ? "text-success" : "text-muted-foreground"}`} />
+              <p className="text-xs text-muted-foreground">
+                {Object.keys(quotes).length > 0 ? `Atualizado: ${formatLastUpdated(lastUpdated)}` : "Carregando dados..."}
+              </p>
+            </div>
           </div>
-          <div className="ml-auto">
+          <div className="ml-auto flex items-center gap-2">
+            <button
+              onClick={refreshQuotes}
+              disabled={loading}
+              className="p-2 rounded-lg hover:bg-secondary transition-colors disabled:opacity-50"
+              title="Atualizar cotações"
+            >
+              <RefreshCw className={`w-4 h-4 text-muted-foreground ${loading ? "animate-spin" : ""}`} />
+            </button>
             <span className="text-xs px-3 py-1.5 rounded-full font-mono font-semibold text-primary-foreground" style={{ background: "var(--gradient-primary)" }}>
               PRO
             </span>
@@ -313,7 +336,12 @@ const ProAnalysis = () => {
             {/* Stock list */}
             <div className="space-y-3">
               {filtered.map((stock) => (
-                <StockCard key={stock.ticker} stock={stock} />
+                <StockCard
+                  key={stock.ticker}
+                  stock={stock}
+                  livePrice={quotes[stock.ticker]?.price}
+                  liveChange={quotes[stock.ticker]?.change_percent}
+                />
               ))}
               {filtered.length === 0 && (
                 <div className="text-center py-16 text-muted-foreground">
@@ -325,7 +353,7 @@ const ProAnalysis = () => {
         ) : tab === "noticias" ? (
           <NewsSection />
         ) : (
-          <HighRiskSection />
+          <HighRiskSection liveQuotes={quotes} />
         )}
       </div>
     </div>
