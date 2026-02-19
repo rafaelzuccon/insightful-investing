@@ -1,5 +1,6 @@
 import { motion } from "framer-motion";
 import { Check, Zap, Crown, Rocket } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 const plans = [
   {
@@ -54,6 +55,7 @@ const plans = [
 ];
 
 const PricingSection = () => {
+  const navigate = useNavigate();
   return (
     <section id="pricing" className="py-24 relative">
       <div className="absolute inset-0 bg-grid opacity-20" />
@@ -118,9 +120,10 @@ const PricingSection = () => {
               <motion.button
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
+                onClick={() => plan.highlighted && navigate("/pro")}
                 className={`w-full py-3 rounded-xl font-semibold text-sm transition-all ${
                   plan.highlighted
-                    ? "text-primary-foreground"
+                    ? "text-primary-foreground cursor-pointer"
                     : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
                 }`}
                 style={plan.highlighted ? { background: "var(--gradient-primary)" } : undefined}
