@@ -5,6 +5,7 @@ import { Link } from "react-router-dom";
 import { stocksData, type StockAnalysis } from "@/data/stocks";
 import NewsSection from "@/components/NewsSection";
 import HighRiskSection from "@/components/HighRiskSection";
+import StockChart from "@/components/StockChart";
 
 const riskColors = {
   baixo: "text-success bg-success/10 border-success/20",
@@ -70,6 +71,9 @@ const StockCard = ({ stock }: { stock: StockAnalysis }) => {
             className="overflow-hidden"
           >
             <div className="px-5 pb-6 space-y-6 border-t border-border pt-5">
+              {/* Chart */}
+              <StockChart ticker={stock.ticker} currentPrice={stock.price} />
+
               {/* Analysis */}
               <div>
                 <h4 className="text-sm font-semibold flex items-center gap-2 mb-2">

@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import { highRiskStocks } from "@/data/highRiskStocks";
 import type { StockAnalysis } from "@/data/stocks";
+import StockChart from "@/components/StockChart";
 
 const riskColors = {
   baixo: "text-success bg-success/10 border-success/20",
@@ -67,6 +68,9 @@ const HighRiskCard = ({ stock }: { stock: StockAnalysis }) => {
             className="overflow-hidden"
           >
             <div className="px-5 pb-6 space-y-6 border-t border-border pt-5">
+              {/* Chart */}
+              <StockChart ticker={stock.ticker} currentPrice={stock.price} />
+
               {/* Risk warning */}
               <div className="flex items-start gap-3 p-4 rounded-xl bg-destructive/5 border border-destructive/20">
                 <AlertTriangle className="w-5 h-5 text-destructive flex-shrink-0 mt-0.5" />
