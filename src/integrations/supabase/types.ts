@@ -14,7 +14,39 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      stock_quotes: {
+        Row: {
+          change_percent: number
+          id: string
+          market_cap: number | null
+          name: string | null
+          price: number
+          ticker: string
+          updated_at: string
+          volume: number | null
+        }
+        Insert: {
+          change_percent?: number
+          id?: string
+          market_cap?: number | null
+          name?: string | null
+          price?: number
+          ticker: string
+          updated_at?: string
+          volume?: number | null
+        }
+        Update: {
+          change_percent?: number
+          id?: string
+          market_cap?: number | null
+          name?: string | null
+          price?: number
+          ticker?: string
+          updated_at?: string
+          volume?: number | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
