@@ -1,11 +1,12 @@
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, TrendingUp, TrendingDown, Minus, ChevronDown, ChevronUp, Shield, Target, AlertTriangle, DollarSign, BarChart3, Search, Newspaper, Flame, RefreshCw, Wifi } from "lucide-react";
+import { ArrowLeft, TrendingUp, TrendingDown, Minus, ChevronDown, ChevronUp, Shield, Target, AlertTriangle, DollarSign, BarChart3, Search, Newspaper, Flame, RefreshCw, Wifi, Brain } from "lucide-react";
 import { Link } from "react-router-dom";
 import { stocksData, type StockAnalysis } from "@/data/stocks";
 import NewsSection from "@/components/NewsSection";
 import HighRiskSection from "@/components/HighRiskSection";
 import StockChart from "@/components/StockChart";
+import ChartAnalysis from "@/components/ChartAnalysis";
 import { useLiveStockData } from "@/hooks/useLiveStockData";
 
 const riskColors = {
@@ -21,10 +22,18 @@ const recColors = {
   cautela: "text-destructive bg-destructive/10",
 };
 
+import { useMemo } from "react";
+import { generateCandlestickData, type CandleData } from "@/components/StockChart";
+
 const StockCard = ({ stock, livePrice, liveChange }: { stock: StockAnalysis; livePrice?: number; liveChange?: number }) => {
   const [expanded, setExpanded] = useState(false);
   const price = livePrice ?? stock.price;
   const change = liveChange ?? stock.change;
+
+  const chartData = useMemo(
+    () => generateCandlestickData(stock.ticker, price, 90),
+    [stock.ticker, price]
+  );
 
   return (
     <motion.div
@@ -76,6 +85,9 @@ const StockCard = ({ stock, livePrice, liveChange }: { stock: StockAnalysis; liv
             <div className="px-5 pb-6 space-y-6 border-t border-border pt-5">
               {/* Chart */}
               <StockChart ticker={stock.ticker} currentPrice={price} />
+
+              {/* AI Chart Analysis */}
+              <ChartAnalysis ticker={stock.ticker} chartData={chartData} />
 
               {/* Analysis */}
               <div>

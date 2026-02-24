@@ -12,7 +12,7 @@ import {
 } from "recharts";
 import { CandlestickChart, LineChart as LineChartIcon } from "lucide-react";
 
-type CandleData = {
+export type CandleData = {
   date: string;
   open: number;
   high: number;
@@ -22,7 +22,7 @@ type CandleData = {
 };
 
 // Seeded random for consistent data per ticker
-const seededRandom = (seed: string) => {
+export const seededRandom = (seed: string) => {
   let h = 0;
   for (let i = 0; i < seed.length; i++) {
     h = (Math.imul(31, h) + seed.charCodeAt(i)) | 0;
@@ -35,7 +35,7 @@ const seededRandom = (seed: string) => {
   };
 };
 
-const generateCandlestickData = (
+export const generateCandlestickData = (
   ticker: string,
   currentPrice: number,
   days: number = 60
