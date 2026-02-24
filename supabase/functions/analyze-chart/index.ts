@@ -6,6 +6,144 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+const tools = {
+  candlestick: [
+    {
+      type: "function",
+      function: {
+        name: "candlestick_analysis",
+        description: "Retorna análise de padrões candlestick encontrados",
+        parameters: {
+          type: "object",
+          properties: {
+            sinal: {
+              type: "string",
+              enum: ["alta", "baixa", "neutro"],
+              description: "Sinal predominante dos padrões encontrados",
+            },
+            confianca: {
+              type: "string",
+              enum: ["alta", "média", "baixa"],
+              description: "Confiabilidade geral da análise",
+            },
+            padroes: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  nome: { type: "string", description: "Nome do padrão (ex: Doji, Martelo)" },
+                  tipo: { type: "string", enum: ["alta", "baixa", "neutro"] },
+                  descricao: { type: "string", description: "Explicação curta em 1 frase" },
+                },
+                required: ["nome", "tipo", "descricao"],
+                additionalProperties: false,
+              },
+              description: "Top 2-3 padrões mais relevantes",
+            },
+            conclusao: { type: "string", description: "Conclusão em no máximo 2 frases curtas" },
+          },
+          required: ["sinal", "confianca", "padroes", "conclusao"],
+          additionalProperties: false,
+        },
+      },
+    },
+  ],
+  forca: [
+    {
+      type: "function",
+      function: {
+        name: "forca_analysis",
+        description: "Retorna análise de candles de força",
+        parameters: {
+          type: "object",
+          properties: {
+            forca_predominante: {
+              type: "string",
+              enum: ["compradora", "vendedora", "equilibrada"],
+            },
+            momentum: {
+              type: "string",
+              enum: ["aumentando", "estável", "diminuindo"],
+            },
+            pontos: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  titulo: { type: "string", description: "Título curto do ponto (ex: 'Marubozu de alta em 12/02')" },
+                  descricao: { type: "string", description: "Explicação em 1 frase" },
+                  tipo: { type: "string", enum: ["positivo", "negativo", "neutro"] },
+                },
+                required: ["titulo", "descricao", "tipo"],
+                additionalProperties: false,
+              },
+              description: "2-4 observações mais relevantes",
+            },
+            conclusao: { type: "string", description: "Conclusão em no máximo 2 frases curtas" },
+          },
+          required: ["forca_predominante", "momentum", "pontos", "conclusao"],
+          additionalProperties: false,
+        },
+      },
+    },
+  ],
+  suporte_resistencia: [
+    {
+      type: "function",
+      function: {
+        name: "suporte_resistencia_analysis",
+        description: "Retorna análise de suporte e resistência",
+        parameters: {
+          type: "object",
+          properties: {
+            posicao_atual: {
+              type: "string",
+              enum: ["proximo_suporte", "proximo_resistencia", "meio_do_canal"],
+            },
+            suportes: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  preco: { type: "number" },
+                  forca: { type: "string", enum: ["forte", "moderado", "fraco"] },
+                  testes: { type: "number", description: "Quantas vezes testou" },
+                },
+                required: ["preco", "forca", "testes"],
+                additionalProperties: false,
+              },
+              description: "2-3 suportes principais",
+            },
+            resistencias: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  preco: { type: "number" },
+                  forca: { type: "string", enum: ["forte", "moderado", "fraco"] },
+                  testes: { type: "number" },
+                },
+                required: ["preco", "forca", "testes"],
+                additionalProperties: false,
+              },
+              description: "2-3 resistências principais",
+            },
+            conclusao: { type: "string", description: "Conclusão em no máximo 2 frases curtas" },
+          },
+          required: ["posicao_atual", "suportes", "resistencias", "conclusao"],
+          additionalProperties: false,
+        },
+      },
+    },
+  ],
+};
+
+const toolChoices: Record<string, any> = {
+  candlestick: { type: "function", function: { name: "candlestick_analysis" } },
+  forca: { type: "function", function: { name: "forca_analysis" } },
+  suporte_resistencia: { type: "function", function: { name: "suporte_resistencia_analysis" } },
+};
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -17,67 +155,15 @@ serve(async (req) => {
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
-    const systemPrompt = `Você é um analista técnico especializado em ações da B3 (bolsa brasileira). 
-Responda SEMPRE em português brasileiro. Seja direto e técnico.
-Use formatação com emojis para deixar a análise visualmente organizada.`;
+    const systemPrompt = `Você é um analista técnico de ações da B3. Seja conciso e direto. Analise apenas os dados fornecidos.`;
 
-    const analysisPrompts: Record<string, string> = {
-      candlestick: `Analise os seguintes dados de candlestick da ação ${ticker} e identifique padrões de candlestick (como Doji, Martelo, Engolfo, Estrela da Manhã/Noite, Spinning Top, Marubozu, Harami, etc).
-
-Para cada padrão encontrado:
-- Nome do padrão
-- Onde aparece (últimos candles)
-- Se é sinal de alta ou baixa
-- Confiabilidade do sinal (alta/média/baixa)
-- O que sugere para os próximos dias
-
-Dados dos últimos candles (date, open, high, low, close, volume):
-${JSON.stringify(chartData)}
-
-Finalize com uma conclusão geral dos padrões encontrados.`,
-
-      forca: `Analise os seguintes dados de candlestick da ação ${ticker} focando em CANDLES DE FORÇA na análise gráfica.
-
-Identifique:
-- Candles com corpo grande (marubozu ou quase-marubozu) que indicam força compradora ou vendedora
-- Sequências de candles na mesma direção que demonstram momentum
-- Volume acima da média que confirma a força do movimento
-- Candles de exaustão (corpo pequeno após sequência de corpo grande)
-- Divergência entre tamanho do corpo e volume (sinal de alerta)
-
-Para cada candle de força identificado:
-- Data e tipo (comprador/vendedor)
-- Tamanho relativo do corpo vs sombras
-- Volume relativo
-- Significado para a tendência
-
-Dados (date, open, high, low, close, volume):
-${JSON.stringify(chartData)}
-
-Conclua com: a força predominante atual é compradora ou vendedora? O momentum está aumentando ou diminuindo?`,
-
-      suporte_resistencia: `Analise os seguintes dados de candlestick da ação ${ticker} e identifique os principais níveis de SUPORTE e RESISTÊNCIA.
-
-Identifique:
-- Níveis de preço onde o ativo encontrou suporte (parou de cair) e quantas vezes testou
-- Níveis de preço onde o ativo encontrou resistência (parou de subir) e quantas vezes testou
-- Zonas de congestão (faixas de preço onde houve muita negociação)
-- Se algum suporte foi rompido (vira resistência) ou vice-versa
-- Proximidade do preço atual em relação aos suportes/resistências
-
-Forneça:
-- 2-3 níveis de suporte mais relevantes com preço exato
-- 2-3 níveis de resistência mais relevantes com preço exato
-- Análise de rompimento potencial
-- Alvos caso rompa suporte ou resistência
-
-Dados (date, open, high, low, close, volume):
-${JSON.stringify(chartData)}
-
-Conclua com: o preço atual está mais próximo de suporte ou resistência? Qual o cenário mais provável?`,
+    const prompts: Record<string, string> = {
+      candlestick: `Identifique os 2-3 padrões de candlestick mais relevantes nos dados de ${ticker}. Dados: ${JSON.stringify(chartData)}`,
+      forca: `Analise os candles de força (corpo grande, volume, momentum) nos dados de ${ticker}. Dados: ${JSON.stringify(chartData)}`,
+      suporte_resistencia: `Identifique suportes e resistências nos dados de ${ticker}. Dados: ${JSON.stringify(chartData)}`,
     };
 
-    const userPrompt = analysisPrompts[analysisType];
+    const userPrompt = prompts[analysisType];
     if (!userPrompt) throw new Error(`Invalid analysis type: ${analysisType}`);
 
     const response = await fetch(
@@ -94,6 +180,8 @@ Conclua com: o preço atual está mais próximo de suporte ou resistência? Qual
             { role: "system", content: systemPrompt },
             { role: "user", content: userPrompt },
           ],
+          tools: tools[analysisType as keyof typeof tools],
+          tool_choice: toolChoices[analysisType],
         }),
       }
     );
@@ -101,13 +189,13 @@ Conclua com: o preço atual está mais próximo de suporte ou resistência? Qual
     if (!response.ok) {
       if (response.status === 429) {
         return new Response(
-          JSON.stringify({ error: "Limite de requisições excedido. Tente novamente em alguns minutos." }),
+          JSON.stringify({ error: "Limite de requisições excedido." }),
           { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
       if (response.status === 402) {
         return new Response(
-          JSON.stringify({ error: "Créditos insuficientes para análise por I.A." }),
+          JSON.stringify({ error: "Créditos insuficientes." }),
           { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
@@ -117,10 +205,27 @@ Conclua com: o preço atual está mais próximo de suporte ou resistência? Qual
     }
 
     const data = await response.json();
-    const content = data.choices?.[0]?.message?.content ?? "Análise indisponível.";
+    
+    // Extract structured data from tool call
+    const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
+    let analysis: any;
+    
+    if (toolCall?.function?.arguments) {
+      try {
+        analysis = JSON.parse(toolCall.function.arguments);
+      } catch {
+        analysis = null;
+      }
+    }
+    
+    // Fallback to plain text
+    if (!analysis) {
+      const content = data.choices?.[0]?.message?.content ?? "";
+      analysis = { fallback: content };
+    }
 
     return new Response(
-      JSON.stringify({ analysis: content }),
+      JSON.stringify({ analysis, type: analysisType }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (e) {
