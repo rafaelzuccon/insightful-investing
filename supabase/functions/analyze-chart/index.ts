@@ -12,7 +12,7 @@ const tools = {
       type: "function",
       function: {
         name: "candlestick_analysis",
-        description: "Retorna análise de padrões candlestick encontrados",
+        description: "Retorna análise de padrões candlestick encontrados, incluindo Bullish e Bearish",
         parameters: {
           type: "object",
           properties: {
@@ -31,18 +31,21 @@ const tools = {
               items: {
                 type: "object",
                 properties: {
-                  nome: { type: "string", description: "Nome do padrão (ex: Doji, Martelo)" },
-                  tipo: { type: "string", enum: ["alta", "baixa", "neutro"] },
+                  nome: { type: "string", description: "Nome do padrão (ex: Doji, Martelo, Engulfing)" },
+                  tipo: { type: "string", enum: ["bullish", "bearish", "neutro"] },
                   descricao: { type: "string", description: "Explicação curta em 1 frase" },
+                  data: { type: "string", description: "Data onde o padrão ocorre (formato DD/MM do gráfico)" },
                 },
-                required: ["nome", "tipo", "descricao"],
+                required: ["nome", "tipo", "descricao", "data"],
                 additionalProperties: false,
               },
-              description: "Top 2-3 padrões mais relevantes",
+              description: "Top 3-5 padrões mais relevantes encontrados, incluindo bullish e bearish",
             },
+            resumo_bullish: { type: "string", description: "Resumo em 1 frase dos sinais bullish encontrados" },
+            resumo_bearish: { type: "string", description: "Resumo em 1 frase dos sinais bearish encontrados" },
             conclusao: { type: "string", description: "Conclusão em no máximo 2 frases curtas" },
           },
-          required: ["sinal", "confianca", "padroes", "conclusao"],
+          required: ["sinal", "confianca", "padroes", "resumo_bullish", "resumo_bearish", "conclusao"],
           additionalProperties: false,
         },
       },
@@ -158,7 +161,7 @@ serve(async (req) => {
     const systemPrompt = `Você é um analista técnico de ações da B3. Seja conciso e direto. Analise apenas os dados fornecidos.`;
 
     const prompts: Record<string, string> = {
-      candlestick: `Identifique os 2-3 padrões de candlestick mais relevantes nos dados de ${ticker}. Dados: ${JSON.stringify(chartData)}`,
+      candlestick: `Identifique 3-5 padrões de candlestick nos dados de ${ticker}, classificando cada um como BULLISH (alta) ou BEARISH (baixa). Inclua a data exata (DD/MM) onde cada padrão aparece. Identifique padrões como: Hammer, Inverted Hammer, Engulfing (bullish/bearish), Doji, Morning/Evening Star, Shooting Star, Hanging Man, Three White Soldiers, Three Black Crows, etc. Dados: ${JSON.stringify(chartData)}`,
       forca: `Analise os candles de força (corpo grande, volume, momentum) nos dados de ${ticker}. Dados: ${JSON.stringify(chartData)}`,
       suporte_resistencia: `Identifique suportes e resistências nos dados de ${ticker}. Dados: ${JSON.stringify(chartData)}`,
     };
