@@ -1,9 +1,18 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Brain, CandlestickChart, TrendingUp, Layers, Loader2, Sparkles, AlertCircle, ArrowUp, ArrowDown, ChevronDown } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import {
+  ComposedChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+  ReferenceLine,
+} from "recharts";
 
 type AnalysisType = "candlestick" | "forca" | "suporte_resistencia";
 
@@ -65,9 +74,93 @@ const tipoBullet = (tipo: string) => {
   return "bg-warning";
 };
 
+// Candlestick shape for mini charts
+const MiniCandlestickShape = (props: any) => {
+  const { x, width, payload, priceMin, priceMax } = props;
+  if (!payload) return null;
+  const { open, high, low, close } = payload;
+  const isUp = close >= open;
+  const color = isUp ? "hsl(var(--success))" : "hsl(var(--destructive))";
+  const candleX = x + width / 2;
+  const chartHeight = 130;
+  const top = 5;
+  const yScale = (v: number) => top + ((priceMax - v) / (priceMax - priceMin)) * chartHeight;
+
+  const bodyTop = yScale(Math.max(open, close));
+  const bodyBottom = yScale(Math.min(open, close));
+  const bodyHeight = Math.max(bodyBottom - bodyTop, 1);
+
+  return (
+    <g>
+      <line x1={candleX} y1={yScale(high)} x2={candleX} y2={yScale(low)} stroke={color} strokeWidth={1} />
+      <rect x={x + 1} y={bodyTop} width={Math.max(width - 2, 2)} height={bodyHeight} fill={color} stroke={color} strokeWidth={0.5} rx={1} />
+    </g>
+  );
+};
+
+const MiniTooltip = ({ active, payload }: any) => {
+  if (!active || !payload?.[0]) return null;
+  const d = payload[0].payload;
+  const isUp = d.close >= d.open;
+  return (
+    <div className="bg-card border border-border rounded-lg p-2 shadow-xl text-[10px] space-y-0.5">
+      <p className="font-semibold text-foreground">{d.date}</p>
+      <p>A: R${d.open.toFixed(2)} | F: <span className={isUp ? "text-success" : "text-destructive"}>R${d.close.toFixed(2)}</span></p>
+      <p>Max: R${d.high.toFixed(2)} | Min: R${d.low.toFixed(2)}</p>
+    </div>
+  );
+};
+
+// Mini candlestick chart used inside analysis results
+const AnalysisChart = ({ data, referenceLines }: { data: ChartDataPoint[]; referenceLines?: { price: number; color: string; label: string }[] }) => {
+  const priceMin = useMemo(() => Math.min(...data.map((d) => d.low)) * 0.995, [data]);
+  const priceMax = useMemo(() => Math.max(...data.map((d) => d.high)) * 1.005, [data]);
+
+  return (
+    <div className="bg-background/50 rounded-lg border border-border p-1.5 mb-3">
+      <ResponsiveContainer width="100%" height={150}>
+        <ComposedChart data={data} margin={{ top: 5, right: 5, bottom: 0, left: 0 }}>
+          <XAxis
+            dataKey="date"
+            tick={{ fontSize: 8, fill: "hsl(var(--muted-foreground))" }}
+            tickLine={false}
+            axisLine={false}
+            interval={Math.floor(data.length / 5)}
+          />
+          <YAxis
+            domain={[priceMin, priceMax]}
+            tick={{ fontSize: 8, fill: "hsl(var(--muted-foreground))" }}
+            tickLine={false}
+            axisLine={false}
+            tickFormatter={(v) => `${v.toFixed(0)}`}
+            width={32}
+          />
+          <Tooltip content={<MiniTooltip />} />
+          {referenceLines?.map((rl, i) => (
+            <ReferenceLine
+              key={i}
+              y={rl.price}
+              stroke={rl.color}
+              strokeDasharray="4 3"
+              strokeWidth={1.5}
+              label={{ value: `${rl.label} R$${rl.price.toFixed(0)}`, position: "right", fontSize: 8, fill: rl.color }}
+            />
+          ))}
+          <Bar
+            dataKey="high"
+            shape={(props: any) => <MiniCandlestickShape {...props} priceMin={priceMin} priceMax={priceMax} />}
+            isAnimationActive={false}
+          />
+        </ComposedChart>
+      </ResponsiveContainer>
+    </div>
+  );
+};
+
 // Render structured candlestick analysis
-const CandlestickResult = ({ data }: { data: any }) => (
+const CandlestickResult = ({ data, chartData }: { data: any; chartData: ChartDataPoint[] }) => (
   <div className="space-y-3">
+    <AnalysisChart data={chartData} />
     <div className="flex items-center gap-2 flex-wrap">
       {signalBadge(data.sinal)}
       <span className="text-[10px] text-muted-foreground">
@@ -92,8 +185,9 @@ const CandlestickResult = ({ data }: { data: any }) => (
 );
 
 // Render structured force analysis
-const ForcaResult = ({ data }: { data: any }) => (
+const ForcaResult = ({ data, chartData }: { data: any; chartData: ChartDataPoint[] }) => (
   <div className="space-y-3">
+    <AnalysisChart data={chartData} />
     <div className="flex items-center gap-2 flex-wrap">
       <span className="text-[10px] text-muted-foreground">Força:</span>
       {signalBadge(data.forca_predominante)}
@@ -118,8 +212,15 @@ const ForcaResult = ({ data }: { data: any }) => (
 );
 
 // Render structured support/resistance analysis
-const SuporteResult = ({ data }: { data: any }) => (
+const SuporteResult = ({ data, chartData }: { data: any; chartData: ChartDataPoint[] }) => {
+  // Build reference lines from AI-detected levels
+  const refLines: { price: number; color: string; label: string }[] = [];
+  data.suportes?.forEach((s: any) => refLines.push({ price: s.preco, color: "hsl(var(--success))", label: "S" }));
+  data.resistencias?.forEach((r: any) => refLines.push({ price: r.preco, color: "hsl(var(--destructive))", label: "R" }));
+
+  return (
   <div className="space-y-3">
+    <AnalysisChart data={chartData} referenceLines={refLines} />
     <div className="flex items-center gap-2">
       {signalBadge(data.posicao_atual)}
     </div>
@@ -159,16 +260,17 @@ const SuporteResult = ({ data }: { data: any }) => (
       {data.conclusao}
     </p>
   </div>
-);
+  );
+};
 
-const renderAnalysis = (type: AnalysisType, data: any) => {
+const renderAnalysis = (type: AnalysisType, data: any, chartData: ChartDataPoint[]) => {
   if (data?.fallback) {
     return <p className="text-xs text-muted-foreground leading-relaxed">{data.fallback}</p>;
   }
   switch (type) {
-    case "candlestick": return <CandlestickResult data={data} />;
-    case "forca": return <ForcaResult data={data} />;
-    case "suporte_resistencia": return <SuporteResult data={data} />;
+    case "candlestick": return <CandlestickResult data={data} chartData={chartData} />;
+    case "forca": return <ForcaResult data={data} chartData={chartData} />;
+    case "suporte_resistencia": return <SuporteResult data={data} chartData={chartData} />;
   }
 };
 
@@ -260,7 +362,7 @@ const ChartAnalysis = ({ ticker, chartData }: ChartAnalysisProps) => {
                         <span className="text-xs text-muted-foreground">Analisando {ticker}...</span>
                       </div>
                     ) : hasResult ? (
-                      renderAnalysis(at.key, analyses[at.key])
+                      renderAnalysis(at.key, analyses[at.key], chartData)
                     ) : (
                       <div className="flex items-center justify-center gap-2 py-4 text-muted-foreground">
                         <AlertCircle className="w-4 h-4" />
