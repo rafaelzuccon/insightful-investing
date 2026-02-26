@@ -69,8 +69,8 @@ const forcaBadge = (forca: string) => {
 };
 
 const tipoBullet = (tipo: string) => {
-  if (tipo === "positivo" || tipo === "alta") return "bg-success";
-  if (tipo === "negativo" || tipo === "baixa") return "bg-destructive";
+  if (tipo === "positivo" || tipo === "alta" || tipo === "bullish") return "bg-success";
+  if (tipo === "negativo" || tipo === "baixa" || tipo === "bearish") return "bg-destructive";
   return "bg-warning";
 };
 
@@ -157,32 +157,151 @@ const AnalysisChart = ({ data, referenceLines }: { data: ChartDataPoint[]; refer
   );
 };
 
-// Render structured candlestick analysis
-const CandlestickResult = ({ data, chartData }: { data: any; chartData: ChartDataPoint[] }) => (
-  <div className="space-y-3">
-    <AnalysisChart data={chartData} />
-    <div className="flex items-center gap-2 flex-wrap">
-      {signalBadge(data.sinal)}
-      <span className="text-[10px] text-muted-foreground">
-        Confiança: <span className="font-semibold text-foreground">{data.confianca}</span>
-      </span>
-    </div>
-    <div className="space-y-2">
-      {data.padroes?.map((p: any, i: number) => (
-        <div key={i} className="flex items-start gap-2">
-          <div className={`w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0 ${tipoBullet(p.tipo)}`} />
-          <div>
-            <span className="text-xs font-semibold text-foreground">{p.nome}</span>
-            <p className="text-[11px] text-muted-foreground leading-snug">{p.descricao}</p>
-          </div>
+// Custom dot to mark pattern locations on chart
+const PatternMarker = ({ cx, cy, payload, patterns }: any) => {
+  if (!patterns || !payload) return null;
+  const match = patterns.find((p: any) => p.data === payload.date);
+  if (!match) return null;
+  const isBullish = match.tipo === "bullish";
+  const color = isBullish ? "hsl(var(--success))" : "hsl(var(--destructive))";
+  const arrow = isBullish ? "▲" : "▼";
+  const yOffset = isBullish ? 12 : -8;
+  return (
+    <g>
+      <text x={cx} y={cy + yOffset} textAnchor="middle" fontSize={10} fill={color} fontWeight="bold">
+        {arrow}
+      </text>
+    </g>
+  );
+};
+
+// Render structured candlestick analysis with bullish/bearish
+const CandlestickResult = ({ data, chartData }: { data: any; chartData: ChartDataPoint[] }) => {
+  const patterns = data.padroes || [];
+  const bullishCount = patterns.filter((p: any) => p.tipo === "bullish").length;
+  const bearishCount = patterns.filter((p: any) => p.tipo === "bearish").length;
+
+  // Build chart data with pattern markers
+  const chartWithMarkers = chartData.map((d) => {
+    const match = patterns.find((p: any) => p.data === d.date);
+    return { ...d, marker: match ? (match.tipo === "bullish" ? d.high * 1.01 : d.low * 0.99) : undefined };
+  });
+
+  const priceMin = Math.min(...chartData.map((d) => d.low)) * 0.993;
+  const priceMax = Math.max(...chartData.map((d) => d.high)) * 1.007;
+
+  return (
+    <div className="space-y-3">
+      {/* Chart with pattern markers */}
+      <div className="bg-background/50 rounded-lg border border-border p-1.5">
+        <ResponsiveContainer width="100%" height={160}>
+          <ComposedChart data={chartWithMarkers} margin={{ top: 10, right: 5, bottom: 0, left: 0 }}>
+            <XAxis
+              dataKey="date"
+              tick={{ fontSize: 8, fill: "hsl(var(--muted-foreground))" }}
+              tickLine={false}
+              axisLine={false}
+              interval={Math.floor(chartData.length / 5)}
+            />
+            <YAxis
+              domain={[priceMin, priceMax]}
+              tick={{ fontSize: 8, fill: "hsl(var(--muted-foreground))" }}
+              tickLine={false}
+              axisLine={false}
+              tickFormatter={(v) => `${v.toFixed(0)}`}
+              width={32}
+            />
+            <Bar
+              dataKey="high"
+              shape={(props: any) => <MiniCandlestickShape {...props} priceMin={priceMin} priceMax={priceMax} />}
+              isAnimationActive={false}
+            />
+            {/* Bullish/Bearish markers as scatter-like dots via ReferenceDot would be complex, use custom bar overlay */}
+            {patterns.map((p: any, i: number) => {
+              const idx = chartData.findIndex((d) => d.date === p.data);
+              if (idx === -1) return null;
+              const price = p.tipo === "bullish" ? chartData[idx].low : chartData[idx].high;
+              return (
+                <ReferenceLine
+                  key={i}
+                  x={p.data}
+                  stroke={p.tipo === "bullish" ? "hsl(var(--success))" : "hsl(var(--destructive))"}
+                  strokeDasharray="2 2"
+                  strokeWidth={1}
+                  opacity={0.6}
+                />
+              );
+            })}
+          </ComposedChart>
+        </ResponsiveContainer>
+        {/* Legend */}
+        <div className="flex items-center justify-center gap-4 mt-1 mb-0.5">
+          <span className="flex items-center gap-1 text-[9px] text-success font-semibold">
+            <span className="w-2 h-0.5 bg-success inline-block" style={{ borderTop: "1px dashed" }} /> Bullish
+          </span>
+          <span className="flex items-center gap-1 text-[9px] text-destructive font-semibold">
+            <span className="w-2 h-0.5 bg-destructive inline-block" style={{ borderTop: "1px dashed" }} /> Bearish
+          </span>
         </div>
-      ))}
+      </div>
+
+      {/* Bullish / Bearish summary badges */}
+      <div className="flex items-center gap-2 flex-wrap">
+        {signalBadge(data.sinal)}
+        <span className="text-[10px] px-2 py-0.5 rounded-full border font-semibold text-success bg-success/10 border-success/20">
+          🐂 {bullishCount} Bullish
+        </span>
+        <span className="text-[10px] px-2 py-0.5 rounded-full border font-semibold text-destructive bg-destructive/10 border-destructive/20">
+          🐻 {bearishCount} Bearish
+        </span>
+        <span className="text-[10px] text-muted-foreground">
+          Confiança: <span className="font-semibold text-foreground">{data.confianca}</span>
+        </span>
+      </div>
+
+      {/* Bullish summary */}
+      {data.resumo_bullish && (
+        <div className="flex items-start gap-2 bg-success/5 rounded-lg px-3 py-2 border border-success/15">
+          <span className="text-sm mt-0.5">🐂</span>
+          <p className="text-[11px] text-success leading-snug">{data.resumo_bullish}</p>
+        </div>
+      )}
+
+      {/* Bearish summary */}
+      {data.resumo_bearish && (
+        <div className="flex items-start gap-2 bg-destructive/5 rounded-lg px-3 py-2 border border-destructive/15">
+          <span className="text-sm mt-0.5">🐻</span>
+          <p className="text-[11px] text-destructive leading-snug">{data.resumo_bearish}</p>
+        </div>
+      )}
+
+      {/* Pattern list */}
+      <div className="space-y-2">
+        {patterns.map((p: any, i: number) => (
+          <div key={i} className="flex items-start gap-2">
+            <div className={`w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0 ${tipoBullet(p.tipo)}`} />
+            <div className="flex-1">
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs font-semibold text-foreground">{p.nome}</span>
+                <span className={`text-[9px] px-1.5 py-0 rounded-full font-bold uppercase ${
+                  p.tipo === "bullish" ? "text-success bg-success/10" : p.tipo === "bearish" ? "text-destructive bg-destructive/10" : "text-muted-foreground bg-secondary"
+                }`}>
+                  {p.tipo}
+                </span>
+                {p.data && <span className="text-[9px] text-muted-foreground font-mono">{p.data}</span>}
+              </div>
+              <p className="text-[11px] text-muted-foreground leading-snug">{p.descricao}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <p className="text-xs text-muted-foreground border-t border-border pt-2 leading-relaxed">
+        {data.conclusao}
+      </p>
     </div>
-    <p className="text-xs text-muted-foreground border-t border-border pt-2 leading-relaxed">
-      {data.conclusao}
-    </p>
-  </div>
-);
+  );
+};
 
 // Render structured force analysis
 const ForcaResult = ({ data, chartData }: { data: any; chartData: ChartDataPoint[] }) => (
