@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Brain, CandlestickChart, TrendingUp, Layers, Loader2, Sparkles, AlertCircle, ArrowUp, ArrowDown, Minus, ShieldCheck } from "lucide-react";
+import { Brain, CandlestickChart, TrendingUp, Layers, Loader2, Sparkles, AlertCircle, ArrowUp, ArrowDown, ChevronDown } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 type AnalysisType = "candlestick" | "forca" | "suporte_resistencia";
 
@@ -172,12 +173,11 @@ const renderAnalysis = (type: AnalysisType, data: any) => {
 };
 
 const ChartAnalysis = ({ ticker, chartData }: ChartAnalysisProps) => {
-  const [selectedType, setSelectedType] = useState<AnalysisType | null>(null);
   const [analyses, setAnalyses] = useState<Partial<Record<AnalysisType, any>>>({});
   const [loading, setLoading] = useState<AnalysisType | null>(null);
+  const [openSections, setOpenSections] = useState<Partial<Record<AnalysisType, boolean>>>({});
 
   const requestAnalysis = async (type: AnalysisType) => {
-    setSelectedType(type);
     if (analyses[type]) return;
 
     setLoading(type);
@@ -201,81 +201,79 @@ const ChartAnalysis = ({ ticker, chartData }: ChartAnalysisProps) => {
     }
   };
 
+  const handleToggle = (type: AnalysisType) => {
+    setOpenSections((prev) => ({ ...prev, [type]: !prev[type] }));
+    if (!analyses[type] && loading !== type) {
+      requestAnalysis(type);
+    }
+  };
+
   return (
-    <div>
-      <div className="flex items-center justify-between mb-3">
-        <h4 className="text-sm font-semibold flex items-center gap-2">
-          <Brain className="w-4 h-4 text-primary" />
-          Análise Gráfica I.A.
-          <span className="text-[10px] px-1.5 py-0.5 rounded-full font-mono font-bold text-primary-foreground" style={{ background: "var(--gradient-primary)" }}>
-            AI
-          </span>
-        </h4>
-        <div className="flex items-center gap-1">
-          {analysisTypes.map((at) => {
-            const Icon = at.icon;
-            const isSelected = selectedType === at.key;
-            const isLoading = loading === at.key;
-            const hasResult = !!analyses[at.key];
+    <div className="space-y-2">
+      <h4 className="text-sm font-semibold flex items-center gap-2 mb-3">
+        <Brain className="w-4 h-4 text-primary" />
+        Análise Gráfica I.A.
+        <span className="text-[10px] px-1.5 py-0.5 rounded-full font-mono font-bold text-primary-foreground" style={{ background: "var(--gradient-primary)" }}>
+          AI
+        </span>
+      </h4>
 
-            return (
+      {analysisTypes.map((at) => {
+        const Icon = at.icon;
+        const isOpen = !!openSections[at.key];
+        const isLoading = loading === at.key;
+        const hasResult = !!analyses[at.key];
+
+        return (
+          <Collapsible key={at.key} open={isOpen} onOpenChange={() => handleToggle(at.key)}>
+            <CollapsibleTrigger asChild>
               <button
-                key={at.key}
-                onClick={(e) => { e.stopPropagation(); requestAnalysis(at.key); }}
-                disabled={isLoading}
-                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-medium transition-all ${
-                  isSelected
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-secondary text-muted-foreground hover:text-foreground"
-                }`}
+                onClick={(e) => e.stopPropagation()}
+                className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg bg-secondary/50 hover:bg-secondary/80 border border-border transition-all group"
               >
-                {isLoading ? (
-                  <Loader2 className="w-3 h-3 animate-spin" />
-                ) : (
-                  <Icon className="w-3 h-3" />
-                )}
-                {at.label}
-                {hasResult && !isSelected && <Sparkles className="w-2.5 h-2.5 text-primary" />}
+                <div className="flex items-center gap-2">
+                  <Icon className="w-4 h-4 text-primary" />
+                  <span className="text-xs font-semibold text-foreground">{at.label}</span>
+                  {hasResult && (
+                    <Sparkles className="w-3 h-3 text-primary" />
+                  )}
+                  {isLoading && (
+                    <Loader2 className="w-3 h-3 text-primary animate-spin" />
+                  )}
+                </div>
+                <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`} />
               </button>
-            );
-          })}
-        </div>
-      </div>
-
-      <AnimatePresence mode="wait">
-        {selectedType && (
-          <motion.div
-            key={selectedType}
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
-            transition={{ duration: 0.2 }}
-            className="bg-secondary/30 rounded-xl p-4 border border-border"
-          >
-            {loading === selectedType ? (
-              <div className="flex items-center justify-center gap-3 py-6">
-                <Loader2 className="w-5 h-5 text-primary animate-spin" />
-                <span className="text-xs text-muted-foreground">Analisando {ticker}...</span>
-              </div>
-            ) : analyses[selectedType] ? (
-              renderAnalysis(selectedType, analyses[selectedType])
-            ) : (
-              <div className="flex items-center justify-center gap-2 py-4 text-muted-foreground">
-                <AlertCircle className="w-4 h-4" />
-                <span className="text-xs">Não disponível. Tente novamente.</span>
-              </div>
-            )}
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {!selectedType && (
-        <div className="bg-secondary/20 rounded-xl border border-dashed border-border py-4 text-center">
-          <p className="text-[11px] text-muted-foreground">
-            Clique em um tipo acima para gerar análise por I.A.
-          </p>
-        </div>
-      )}
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <AnimatePresence>
+                {isOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -4 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -4 }}
+                    transition={{ duration: 0.15 }}
+                    className="mt-1 bg-secondary/30 rounded-xl p-4 border border-border"
+                  >
+                    {isLoading ? (
+                      <div className="flex items-center justify-center gap-3 py-6">
+                        <Loader2 className="w-5 h-5 text-primary animate-spin" />
+                        <span className="text-xs text-muted-foreground">Analisando {ticker}...</span>
+                      </div>
+                    ) : hasResult ? (
+                      renderAnalysis(at.key, analyses[at.key])
+                    ) : (
+                      <div className="flex items-center justify-center gap-2 py-4 text-muted-foreground">
+                        <AlertCircle className="w-4 h-4" />
+                        <span className="text-xs">Não disponível. Tente novamente.</span>
+                      </div>
+                    )}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </CollapsibleContent>
+          </Collapsible>
+        );
+      })}
     </div>
   );
 };
