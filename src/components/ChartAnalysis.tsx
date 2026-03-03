@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Brain, CandlestickChart, TrendingUp, Layers, Loader2, Sparkles, AlertCircle, ArrowUp, ArrowDown, ChevronDown } from "lucide-react";
+import { Brain, CandlestickChart, TrendingUp, Layers, Loader2, Sparkles, AlertCircle, ArrowUp, ArrowDown, ChevronDown, Activity, BarChart3, GitBranch } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -330,55 +330,176 @@ const ForcaResult = ({ data, chartData }: { data: any; chartData: ChartDataPoint
   </div>
 );
 
-// Render structured support/resistance analysis
+// Render structured support/resistance analysis with Fibonacci, Bollinger, Volume
 const SuporteResult = ({ data, chartData }: { data: any; chartData: ChartDataPoint[] }) => {
   // Build reference lines from AI-detected levels
   const refLines: { price: number; color: string; label: string }[] = [];
   data.suportes?.forEach((s: any) => refLines.push({ price: s.preco, color: "hsl(var(--success))", label: "S" }));
   data.resistencias?.forEach((r: any) => refLines.push({ price: r.preco, color: "hsl(var(--destructive))", label: "R" }));
 
+  // Fibonacci levels
+  if (data.fibonacci?.niveis) {
+    data.fibonacci.niveis.forEach((n: any) => {
+      refLines.push({ price: n.preco, color: "hsl(45, 100%, 55%)", label: `Fib ${n.nivel}` });
+    });
+  }
+
+  // Bollinger bands
+  if (data.bollinger) {
+    refLines.push({ price: data.bollinger.banda_superior, color: "hsl(210, 80%, 60%)", label: "BB↑" });
+    refLines.push({ price: data.bollinger.media, color: "hsl(210, 60%, 50%)", label: "SMA20" });
+    refLines.push({ price: data.bollinger.banda_inferior, color: "hsl(210, 80%, 60%)", label: "BB↓" });
+  }
+
+  // Volume zones
+  if (data.volume_analise?.zonas_alto_volume) {
+    data.volume_analise.zonas_alto_volume.forEach((z: any) => {
+      refLines.push({ price: z.preco_zona, color: "hsl(280, 70%, 60%)", label: z.tipo === "suporte" ? "Vol.S" : "Vol.R" });
+    });
+  }
+
+  const bollingerPosMap: Record<string, { label: string; color: string }> = {
+    acima_superior: { label: "Acima da Banda Superior", color: "text-destructive" },
+    proximo_superior: { label: "Próx. Banda Superior", color: "text-warning" },
+    meio: { label: "Região Central", color: "text-muted-foreground" },
+    proximo_inferior: { label: "Próx. Banda Inferior", color: "text-warning" },
+    abaixo_inferior: { label: "Abaixo da Banda Inferior", color: "text-success" },
+  };
+
+  const fibRelevanciaColor = (r: string) => {
+    if (r === "alta") return "text-primary font-bold";
+    if (r === "média") return "text-foreground";
+    return "text-muted-foreground";
+  };
+
   return (
-  <div className="space-y-3">
-    <AnalysisChart data={chartData} referenceLines={refLines} />
-    <div className="flex items-center gap-2">
-      {signalBadge(data.posicao_atual)}
-    </div>
-    <div className="grid grid-cols-2 gap-3">
-      {/* Suportes */}
-      <div className="space-y-1.5">
-        <p className="text-[10px] font-semibold text-success flex items-center gap-1">
-          <ArrowDown className="w-3 h-3" /> Suportes
-        </p>
-        {data.suportes?.map((s: any, i: number) => (
-          <div key={i} className={`rounded-lg border px-2 py-1.5 ${forcaBadge(s.forca)}`}>
-            <div className="flex items-center justify-between">
-              <span className="font-mono text-xs font-bold">R${s.preco.toFixed(2)}</span>
-              <span className="text-[9px] opacity-70">{s.testes}x testado</span>
-            </div>
-            <span className="text-[9px] capitalize">{s.forca}</span>
-          </div>
-        ))}
+    <div className="space-y-3">
+      <AnalysisChart data={chartData} referenceLines={refLines} />
+      
+      {/* Legend */}
+      <div className="flex flex-wrap gap-2 text-[9px]">
+        <span className="flex items-center gap-1"><span className="w-3 h-0.5 bg-success inline-block" /> Suporte</span>
+        <span className="flex items-center gap-1"><span className="w-3 h-0.5 bg-destructive inline-block" /> Resistência</span>
+        <span className="flex items-center gap-1"><span className="w-3 h-0.5 inline-block" style={{ background: "hsl(45, 100%, 55%)" }} /> Fibonacci</span>
+        <span className="flex items-center gap-1"><span className="w-3 h-0.5 inline-block" style={{ background: "hsl(210, 80%, 60%)" }} /> Bollinger</span>
+        <span className="flex items-center gap-1"><span className="w-3 h-0.5 inline-block" style={{ background: "hsl(280, 70%, 60%)" }} /> Volume</span>
       </div>
-      {/* Resistências */}
-      <div className="space-y-1.5">
-        <p className="text-[10px] font-semibold text-destructive flex items-center gap-1">
-          <ArrowUp className="w-3 h-3" /> Resistências
-        </p>
-        {data.resistencias?.map((r: any, i: number) => (
-          <div key={i} className={`rounded-lg border px-2 py-1.5 ${forcaBadge(r.forca)}`}>
-            <div className="flex items-center justify-between">
-              <span className="font-mono text-xs font-bold">R${r.preco.toFixed(2)}</span>
-              <span className="text-[9px] opacity-70">{r.testes}x testado</span>
-            </div>
-            <span className="text-[9px] capitalize">{r.forca}</span>
-          </div>
-        ))}
+
+      <div className="flex items-center gap-2">
+        {signalBadge(data.posicao_atual)}
       </div>
+
+      {/* S&R traditional */}
+      <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-1.5">
+          <p className="text-[10px] font-semibold text-success flex items-center gap-1">
+            <ArrowDown className="w-3 h-3" /> Suportes
+          </p>
+          {data.suportes?.map((s: any, i: number) => (
+            <div key={i} className={`rounded-lg border px-2 py-1.5 ${forcaBadge(s.forca)}`}>
+              <div className="flex items-center justify-between">
+                <span className="font-mono text-xs font-bold">R${s.preco.toFixed(2)}</span>
+                <span className="text-[9px] opacity-70">{s.testes}x testado</span>
+              </div>
+              <span className="text-[9px] capitalize">{s.forca}</span>
+            </div>
+          ))}
+        </div>
+        <div className="space-y-1.5">
+          <p className="text-[10px] font-semibold text-destructive flex items-center gap-1">
+            <ArrowUp className="w-3 h-3" /> Resistências
+          </p>
+          {data.resistencias?.map((r: any, i: number) => (
+            <div key={i} className={`rounded-lg border px-2 py-1.5 ${forcaBadge(r.forca)}`}>
+              <div className="flex items-center justify-between">
+                <span className="font-mono text-xs font-bold">R${r.preco.toFixed(2)}</span>
+                <span className="text-[9px] opacity-70">{r.testes}x testado</span>
+              </div>
+              <span className="text-[9px] capitalize">{r.forca}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Fibonacci */}
+      {data.fibonacci && (
+        <div className="bg-background/50 rounded-lg border border-border p-3 space-y-2">
+          <p className="text-[10px] font-semibold flex items-center gap-1.5" style={{ color: "hsl(45, 100%, 55%)" }}>
+            <GitBranch className="w-3 h-3" /> Retração de Fibonacci
+            <span className="text-[9px] text-muted-foreground font-normal ml-1">
+              ({data.fibonacci.tendencia === "alta" ? "Tendência de Alta" : "Tendência de Baixa"})
+            </span>
+          </p>
+          <div className="flex items-center gap-3 text-[9px] text-muted-foreground">
+            <span>Swing High: <span className="font-mono font-bold text-foreground">R${data.fibonacci.ponto_alto?.toFixed(2)}</span></span>
+            <span>Swing Low: <span className="font-mono font-bold text-foreground">R${data.fibonacci.ponto_baixo?.toFixed(2)}</span></span>
+          </div>
+          <div className="grid grid-cols-5 gap-1">
+            {data.fibonacci.niveis?.map((n: any, i: number) => (
+              <div key={i} className="text-center rounded border border-border px-1 py-1 bg-secondary/30">
+                <p className="text-[9px] font-bold" style={{ color: "hsl(45, 100%, 55%)" }}>{n.nivel}</p>
+                <p className={`text-[10px] font-mono ${fibRelevanciaColor(n.relevancia)}`}>R${n.preco.toFixed(2)}</p>
+                <p className="text-[8px] text-muted-foreground capitalize">{n.relevancia}</p>
+              </div>
+            ))}
+          </div>
+          <p className="text-[10px] text-muted-foreground italic">{data.fibonacci.observacao}</p>
+        </div>
+      )}
+
+      {/* Bollinger Bands */}
+      {data.bollinger && (
+        <div className="bg-background/50 rounded-lg border border-border p-3 space-y-2">
+          <p className="text-[10px] font-semibold flex items-center gap-1.5" style={{ color: "hsl(210, 80%, 60%)" }}>
+            <Activity className="w-3 h-3" /> Bandas de Bollinger
+          </p>
+          <div className="flex items-center gap-3 flex-wrap">
+            <span className="text-[9px] text-muted-foreground">
+              Posição: <span className={`font-semibold ${bollingerPosMap[data.bollinger.posicao_preco]?.color || "text-foreground"}`}>
+                {bollingerPosMap[data.bollinger.posicao_preco]?.label || data.bollinger.posicao_preco}
+              </span>
+            </span>
+            <span className="text-[9px] text-muted-foreground">
+              Bandas: <span className="font-semibold text-foreground capitalize">{data.bollinger.largura}</span>
+            </span>
+          </div>
+          <div className="flex items-center gap-4 text-[9px]">
+            <span>BB↑: <span className="font-mono font-bold text-foreground">R${data.bollinger.banda_superior?.toFixed(2)}</span></span>
+            <span>SMA20: <span className="font-mono font-bold text-foreground">R${data.bollinger.media?.toFixed(2)}</span></span>
+            <span>BB↓: <span className="font-mono font-bold text-foreground">R${data.bollinger.banda_inferior?.toFixed(2)}</span></span>
+          </div>
+          <p className="text-[10px] text-muted-foreground italic">{data.bollinger.observacao}</p>
+        </div>
+      )}
+
+      {/* Volume Analysis */}
+      {data.volume_analise && (
+        <div className="bg-background/50 rounded-lg border border-border p-3 space-y-2">
+          <p className="text-[10px] font-semibold flex items-center gap-1.5" style={{ color: "hsl(280, 70%, 60%)" }}>
+            <BarChart3 className="w-3 h-3" /> Volume Financeiro
+            <span className="text-[9px] text-muted-foreground font-normal ml-1">
+              (Tendência: <span className="capitalize font-semibold text-foreground">{data.volume_analise.tendencia_volume}</span>)
+            </span>
+          </p>
+          {data.volume_analise.zonas_alto_volume?.map((z: any, i: number) => (
+            <div key={i} className="flex items-start gap-2">
+              <div className={`w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0 ${z.tipo === "suporte" ? "bg-success" : "bg-destructive"}`} />
+              <div>
+                <span className="text-xs font-semibold text-foreground">
+                  R${z.preco_zona?.toFixed(2)} <span className={`text-[9px] ${z.tipo === "suporte" ? "text-success" : "text-destructive"}`}>({z.tipo})</span>
+                </span>
+                <p className="text-[11px] text-muted-foreground leading-snug">{z.descricao}</p>
+              </div>
+            </div>
+          ))}
+          <p className="text-[10px] text-muted-foreground italic">{data.volume_analise.observacao}</p>
+        </div>
+      )}
+
+      <p className="text-xs text-muted-foreground border-t border-border pt-2 leading-relaxed">
+        {data.conclusao}
+      </p>
     </div>
-    <p className="text-xs text-muted-foreground border-t border-border pt-2 leading-relaxed">
-      {data.conclusao}
-    </p>
-  </div>
   );
 };
 
