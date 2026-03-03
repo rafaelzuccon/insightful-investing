@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Brain, CandlestickChart, TrendingUp, Layers, Loader2, Sparkles, AlertCircle, ArrowUp, ArrowDown, ChevronDown, Activity, BarChart3, GitBranch } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -28,6 +28,7 @@ type ChartDataPoint = {
 type ChartAnalysisProps = {
   ticker: string;
   chartData: ChartDataPoint[];
+  onScoreUpdate?: (scores: Partial<Record<AnalysisType, number>>) => void;
 };
 
 const analysisTypes: { key: AnalysisType; label: string; icon: typeof CandlestickChart }[] = [
@@ -72,6 +73,18 @@ const tipoBullet = (tipo: string) => {
   if (tipo === "positivo" || tipo === "alta" || tipo === "bullish") return "bg-success";
   if (tipo === "negativo" || tipo === "baixa" || tipo === "bearish") return "bg-destructive";
   return "bg-warning";
+};
+
+// Score badge for each analysis
+const ScoreBadge = ({ score, label }: { score: number; label: string }) => {
+  const color = score >= 7 ? "text-success border-success/30 bg-success/10" : score >= 4 ? "text-warning border-warning/30 bg-warning/10" : "text-destructive border-destructive/30 bg-destructive/10";
+  return (
+    <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border ${color}`}>
+      <span className="text-[10px] font-medium">{label}</span>
+      <span className="font-mono text-sm font-bold">{score.toFixed(1)}</span>
+      <span className="text-[9px] opacity-60">/10</span>
+    </div>
+  );
 };
 
 // Candlestick shape for mini charts
@@ -245,8 +258,9 @@ const CandlestickResult = ({ data, chartData }: { data: any; chartData: ChartDat
         </div>
       </div>
 
-      {/* Bullish / Bearish summary badges */}
+      {/* Score + Bullish / Bearish summary badges */}
       <div className="flex items-center gap-2 flex-wrap">
+        {data.score != null && <ScoreBadge score={data.score} label="Score" />}
         {signalBadge(data.sinal)}
         <span className="text-[10px] px-2 py-0.5 rounded-full border font-semibold text-success bg-success/10 border-success/20">
           🐂 {bullishCount} Bullish
@@ -308,6 +322,7 @@ const ForcaResult = ({ data, chartData }: { data: any; chartData: ChartDataPoint
   <div className="space-y-3">
     <AnalysisChart data={chartData} />
     <div className="flex items-center gap-2 flex-wrap">
+      {data.score != null && <ScoreBadge score={data.score} label="Score" />}
       <span className="text-[10px] text-muted-foreground">Força:</span>
       {signalBadge(data.forca_predominante)}
       <span className="text-[10px] text-muted-foreground">Momentum:</span>
@@ -386,6 +401,7 @@ const SuporteResult = ({ data, chartData }: { data: any; chartData: ChartDataPoi
       </div>
 
       <div className="flex items-center gap-2">
+        {data.score != null && <ScoreBadge score={data.score} label="Score" />}
         {signalBadge(data.posicao_atual)}
       </div>
 
@@ -514,10 +530,24 @@ const renderAnalysis = (type: AnalysisType, data: any, chartData: ChartDataPoint
   }
 };
 
-const ChartAnalysis = ({ ticker, chartData }: ChartAnalysisProps) => {
+const ChartAnalysis = ({ ticker, chartData, onScoreUpdate }: ChartAnalysisProps) => {
   const [analyses, setAnalyses] = useState<Partial<Record<AnalysisType, any>>>({});
   const [loading, setLoading] = useState<AnalysisType | null>(null);
   const [openSections, setOpenSections] = useState<Partial<Record<AnalysisType, boolean>>>({});
+
+  // Bubble scores up whenever analyses change
+  useEffect(() => {
+    if (!onScoreUpdate) return;
+    const scores: Partial<Record<AnalysisType, number>> = {};
+    for (const key of ["candlestick", "forca", "suporte_resistencia"] as AnalysisType[]) {
+      if (analyses[key]?.score != null) {
+        scores[key] = analyses[key].score;
+      }
+    }
+    if (Object.keys(scores).length > 0) {
+      onScoreUpdate(scores);
+    }
+  }, [analyses, onScoreUpdate]);
 
   const requestAnalysis = async (type: AnalysisType) => {
     if (analyses[type]) return;
@@ -621,3 +651,4 @@ const ChartAnalysis = ({ ticker, chartData }: ChartAnalysisProps) => {
 };
 
 export default ChartAnalysis;
+export type { AnalysisType };
