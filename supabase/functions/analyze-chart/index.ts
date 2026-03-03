@@ -95,7 +95,7 @@ const tools = {
       type: "function",
       function: {
         name: "suporte_resistencia_analysis",
-        description: "Retorna análise de suporte e resistência",
+        description: "Retorna análise completa de suporte e resistência com Fibonacci, Bollinger e Volume",
         parameters: {
           type: "object",
           properties: {
@@ -131,9 +131,70 @@ const tools = {
               },
               description: "2-3 resistências principais",
             },
-            conclusao: { type: "string", description: "Conclusão em no máximo 2 frases curtas" },
+            fibonacci: {
+              type: "object",
+              properties: {
+                tendencia: { type: "string", enum: ["alta", "baixa"], description: "Direção da tendência usada para traçar Fibonacci" },
+                ponto_alto: { type: "number", description: "Preço máximo do swing" },
+                ponto_baixo: { type: "number", description: "Preço mínimo do swing" },
+                niveis: {
+                  type: "array",
+                  items: {
+                    type: "object",
+                    properties: {
+                      nivel: { type: "string", description: "Nível Fib (ex: 0.236, 0.382, 0.5, 0.618, 0.786)" },
+                      preco: { type: "number" },
+                      relevancia: { type: "string", enum: ["alta", "média", "baixa"] },
+                    },
+                    required: ["nivel", "preco", "relevancia"],
+                    additionalProperties: false,
+                  },
+                  description: "Níveis de Fibonacci (0.236, 0.382, 0.5, 0.618, 0.786)",
+                },
+                observacao: { type: "string", description: "Observação sobre confluência com S&R em 1 frase" },
+              },
+              required: ["tendencia", "ponto_alto", "ponto_baixo", "niveis", "observacao"],
+              additionalProperties: false,
+            },
+            bollinger: {
+              type: "object",
+              properties: {
+                posicao_preco: { type: "string", enum: ["acima_superior", "proximo_superior", "meio", "proximo_inferior", "abaixo_inferior"], description: "Onde o preço está em relação às bandas" },
+                largura: { type: "string", enum: ["expandindo", "normal", "contraindo"], description: "Estado das bandas" },
+                banda_superior: { type: "number", description: "Valor da banda superior atual" },
+                banda_inferior: { type: "number", description: "Valor da banda inferior atual" },
+                media: { type: "number", description: "Valor da média móvel central (SMA 20)" },
+                observacao: { type: "string", description: "Observação sobre a dinâmica das bandas em 1 frase" },
+              },
+              required: ["posicao_preco", "largura", "banda_superior", "banda_inferior", "media", "observacao"],
+              additionalProperties: false,
+            },
+            volume_analise: {
+              type: "object",
+              properties: {
+                tendencia_volume: { type: "string", enum: ["crescente", "estável", "decrescente"] },
+                zonas_alto_volume: {
+                  type: "array",
+                  items: {
+                    type: "object",
+                    properties: {
+                      preco_zona: { type: "number", description: "Preço da zona com alto volume" },
+                      tipo: { type: "string", enum: ["suporte", "resistencia"] },
+                      descricao: { type: "string", description: "Descrição curta em 1 frase" },
+                    },
+                    required: ["preco_zona", "tipo", "descricao"],
+                    additionalProperties: false,
+                  },
+                  description: "1-3 zonas de alto volume que confirmam S&R",
+                },
+                observacao: { type: "string", description: "Observação sobre volume em 1 frase" },
+              },
+              required: ["tendencia_volume", "zonas_alto_volume", "observacao"],
+              additionalProperties: false,
+            },
+            conclusao: { type: "string", description: "Conclusão geral em no máximo 3 frases curtas integrando S&R, Fibonacci, Bollinger e Volume" },
           },
-          required: ["posicao_atual", "suportes", "resistencias", "conclusao"],
+          required: ["posicao_atual", "suportes", "resistencias", "fibonacci", "bollinger", "volume_analise", "conclusao"],
           additionalProperties: false,
         },
       },
@@ -163,7 +224,7 @@ serve(async (req) => {
     const prompts: Record<string, string> = {
       candlestick: `Identifique 3-5 padrões de candlestick nos dados de ${ticker}, classificando cada um como BULLISH (alta) ou BEARISH (baixa). Inclua a data exata (DD/MM) onde cada padrão aparece. Identifique padrões como: Hammer, Inverted Hammer, Engulfing (bullish/bearish), Doji, Morning/Evening Star, Shooting Star, Hanging Man, Three White Soldiers, Three Black Crows, etc. Dados: ${JSON.stringify(chartData)}`,
       forca: `Analise os candles de força (corpo grande, volume, momentum) nos dados de ${ticker}. Dados: ${JSON.stringify(chartData)}`,
-      suporte_resistencia: `Identifique suportes e resistências nos dados de ${ticker}. Dados: ${JSON.stringify(chartData)}`,
+      suporte_resistencia: `Faça uma análise completa de Suporte e Resistência para ${ticker}, incluindo: 1) Níveis tradicionais de S&R, 2) Retração de Fibonacci (identifique swing high/low e calcule os níveis 0.236, 0.382, 0.5, 0.618, 0.786), 3) Bandas de Bollinger (SMA 20, 2 desvios - posição do preço, largura das bandas), 4) Análise de Volume Financeiro (zonas de alto volume que confirmam S&R). Dados: ${JSON.stringify(chartData)}`,
     };
 
     const userPrompt = prompts[analysisType];
