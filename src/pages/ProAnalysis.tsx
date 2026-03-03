@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft, TrendingUp, TrendingDown, Minus, ChevronDown, ChevronUp, Shield, Target, AlertTriangle, DollarSign, BarChart3, Search, Newspaper, Flame, RefreshCw, Wifi, Brain } from "lucide-react";
 import { Link } from "react-router-dom";
@@ -25,10 +25,58 @@ const recColors = {
 import { useMemo } from "react";
 import { generateCandlestickData, type CandleData } from "@/components/StockChart";
 
+// Calculate fundamental score (0-10) from stock fundamentals
+const calcFundamentalScore = (stock: StockAnalysis): number => {
+  let score = 5; // base
+  // P/L: lower is better (< 8 = great, > 20 = bad)
+  if (stock.fundamentals.pl < 8) score += 1.5;
+  else if (stock.fundamentals.pl < 15) score += 0.5;
+  else if (stock.fundamentals.pl > 25) score -= 1;
+  // ROE: higher is better
+  if (stock.fundamentals.roe > 20) score += 1.5;
+  else if (stock.fundamentals.roe > 12) score += 0.5;
+  else if (stock.fundamentals.roe < 5) score -= 1;
+  // Dividend Yield
+  if (stock.fundamentals.dividendYield > 8) score += 1;
+  else if (stock.fundamentals.dividendYield > 4) score += 0.5;
+  // Margem Líquida
+  if (stock.fundamentals.margemLiquida > 20) score += 1;
+  else if (stock.fundamentals.margemLiquida > 10) score += 0.5;
+  else if (stock.fundamentals.margemLiquida < 0) score -= 1.5;
+  // Dívida/EBITDA: lower is better
+  if (stock.fundamentals.dividaEbitda < 1.5) score += 1;
+  else if (stock.fundamentals.dividaEbitda > 3) score -= 1;
+  else if (stock.fundamentals.dividaEbitda > 5) score -= 2;
+  // Recommendation bonus
+  if (stock.recommendation === "compra forte") score += 1;
+  else if (stock.recommendation === "cautela") score -= 0.5;
+  return Math.max(0, Math.min(10, score));
+};
+
+type AnalysisType = "candlestick" | "forca" | "suporte_resistencia";
+
 const StockCard = ({ stock, livePrice, liveChange }: { stock: StockAnalysis; livePrice?: number; liveChange?: number }) => {
   const [expanded, setExpanded] = useState(false);
   const price = livePrice ?? stock.price;
   const change = liveChange ?? stock.change;
+  const [technicalScores, setTechnicalScores] = useState<Partial<Record<AnalysisType, number>>>({});
+
+  const fundamentalScore = useMemo(() => calcFundamentalScore(stock), [stock]);
+
+  const technicalScore = useMemo(() => {
+    const vals = Object.values(technicalScores);
+    if (vals.length === 0) return null;
+    return vals.reduce((a, b) => a + b, 0) / vals.length;
+  }, [technicalScores]);
+
+  const totalScore = useMemo(() => {
+    if (technicalScore === null) return null;
+    return fundamentalScore * 0.5 + technicalScore * 0.5;
+  }, [fundamentalScore, technicalScore]);
+
+  const handleScoreUpdate = useCallback((scores: Partial<Record<AnalysisType, number>>) => {
+    setTechnicalScores(scores);
+  }, []);
 
   const chartData = useMemo(
     () => generateCandlestickData(stock.ticker, price, 90),
@@ -87,7 +135,67 @@ const StockCard = ({ stock, livePrice, liveChange }: { stock: StockAnalysis; liv
               <StockChart ticker={stock.ticker} currentPrice={price} />
 
               {/* AI Chart Analysis */}
-              <ChartAnalysis ticker={stock.ticker} chartData={chartData} />
+              <ChartAnalysis ticker={stock.ticker} chartData={chartData} onScoreUpdate={handleScoreUpdate} />
+
+              {/* Score Card */}
+              <div className="bg-secondary/30 rounded-xl border border-border p-4 space-y-3">
+                <h4 className="text-sm font-semibold flex items-center gap-2">
+                  <Brain className="w-4 h-4 text-primary" /> Score Geral
+                </h4>
+                <div className="grid grid-cols-3 gap-3">
+                  {/* Fundamental */}
+                  <div className="text-center space-y-1">
+                    <p className="text-[10px] text-muted-foreground font-medium">Fundamentalista</p>
+                    <div className={`font-mono text-xl font-bold ${fundamentalScore >= 7 ? "text-success" : fundamentalScore >= 4 ? "text-warning" : "text-destructive"}`}>
+                      {fundamentalScore.toFixed(1)}
+                    </div>
+                    <p className="text-[9px] text-muted-foreground">peso 50%</p>
+                    <div className="w-full bg-secondary rounded-full h-1.5">
+                      <div className={`h-1.5 rounded-full transition-all ${fundamentalScore >= 7 ? "bg-success" : fundamentalScore >= 4 ? "bg-warning" : "bg-destructive"}`} style={{ width: `${fundamentalScore * 10}%` }} />
+                    </div>
+                  </div>
+                  {/* Technical */}
+                  <div className="text-center space-y-1">
+                    <p className="text-[10px] text-muted-foreground font-medium">Técnico (I.A.)</p>
+                    {technicalScore !== null ? (
+                      <>
+                        <div className={`font-mono text-xl font-bold ${technicalScore >= 7 ? "text-success" : technicalScore >= 4 ? "text-warning" : "text-destructive"}`}>
+                          {technicalScore.toFixed(1)}
+                        </div>
+                        <p className="text-[9px] text-muted-foreground">peso 50%</p>
+                        <div className="w-full bg-secondary rounded-full h-1.5">
+                          <div className={`h-1.5 rounded-full transition-all ${technicalScore >= 7 ? "bg-success" : technicalScore >= 4 ? "bg-warning" : "bg-destructive"}`} style={{ width: `${technicalScore * 10}%` }} />
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div className="font-mono text-xl font-bold text-muted-foreground">—</div>
+                        <p className="text-[9px] text-muted-foreground">Abra as análises</p>
+                      </>
+                    )}
+                  </div>
+                  {/* Total */}
+                  <div className="text-center space-y-1 border-l border-border pl-3">
+                    <p className="text-[10px] text-primary font-bold">SCORE TOTAL</p>
+                    {totalScore !== null ? (
+                      <>
+                        <div className={`font-mono text-2xl font-bold ${totalScore >= 7 ? "text-success" : totalScore >= 4 ? "text-warning" : "text-destructive"}`}>
+                          {totalScore.toFixed(1)}
+                        </div>
+                        <p className="text-[9px] text-muted-foreground">50% Fund. + 50% Téc.</p>
+                        <div className="w-full bg-secondary rounded-full h-2">
+                          <div className={`h-2 rounded-full transition-all ${totalScore >= 7 ? "bg-success" : totalScore >= 4 ? "bg-warning" : "bg-destructive"}`} style={{ width: `${totalScore * 10}%` }} />
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div className="font-mono text-2xl font-bold text-muted-foreground">—</div>
+                        <p className="text-[9px] text-muted-foreground">Analise os gráficos</p>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
 
               {/* Analysis */}
               <div>
