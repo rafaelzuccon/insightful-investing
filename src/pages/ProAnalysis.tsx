@@ -109,7 +109,38 @@ const StockCard = ({ stock, livePrice, liveChange }: { stock: StockAnalysis; liv
             <p className="text-sm text-muted-foreground">{stock.name} • {stock.sector}</p>
           </div>
         </div>
-        <div className="flex items-center gap-6">
+        <div className="flex items-center gap-4">
+          {/* Score badges - always visible */}
+          <div className="hidden md:flex items-center gap-2">
+            <div className="flex items-center gap-1 px-2 py-1 rounded-lg bg-secondary/50 border border-border">
+              <Target className="w-3 h-3 text-muted-foreground" />
+              <span className="text-[10px] text-muted-foreground">Fund.</span>
+              <span className={`font-mono text-xs font-bold ${fundamentalScore >= 7 ? "text-success" : fundamentalScore >= 4 ? "text-warning" : "text-destructive"}`}>
+                {fundamentalScore.toFixed(1)}
+              </span>
+            </div>
+            <div className="flex items-center gap-1 px-2 py-1 rounded-lg bg-secondary/50 border border-border">
+              <Brain className="w-3 h-3 text-muted-foreground" />
+              <span className="text-[10px] text-muted-foreground">Téc.</span>
+              {technicalScore !== null ? (
+                <span className={`font-mono text-xs font-bold ${technicalScore >= 7 ? "text-success" : technicalScore >= 4 ? "text-warning" : "text-destructive"}`}>
+                  {technicalScore.toFixed(1)}
+                </span>
+              ) : (
+                <span className="font-mono text-xs text-muted-foreground">—</span>
+              )}
+            </div>
+            <div className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-primary/5 border border-primary/20">
+              <span className="text-[10px] text-primary font-semibold">Total</span>
+              {totalScore !== null ? (
+                <span className={`font-mono text-sm font-bold ${totalScore >= 7 ? "text-success" : totalScore >= 4 ? "text-warning" : "text-destructive"}`}>
+                  {totalScore.toFixed(1)}
+                </span>
+              ) : (
+                <span className="font-mono text-sm font-bold text-muted-foreground">—</span>
+              )}
+            </div>
+          </div>
           <div className="text-right hidden sm:block">
             <p className="font-mono font-bold">R${price.toFixed(2)}</p>
             <p className={`text-sm font-mono ${change >= 0 ? "text-success" : "text-destructive"}`}>
