@@ -90,6 +90,8 @@ const StockCard = ({ stock, livePrice, liveChange }: { stock: StockAnalysis; liv
       animate={{ opacity: 1, y: 0 }}
       className="border border-border rounded-2xl bg-card overflow-hidden hover:border-primary/20 transition-colors"
     >
+      {/* Hidden ChartAnalysis to auto-fetch scores */}
+      {!expanded && <ChartAnalysis ticker={stock.ticker} chartData={chartData} onScoreUpdate={handleScoreUpdate} hidden />}
       {/* Header */}
       <button
         onClick={() => setExpanded(!expanded)}
