@@ -530,10 +530,11 @@ const renderAnalysis = (type: AnalysisType, data: any, chartData: ChartDataPoint
   }
 };
 
-const ChartAnalysis = ({ ticker, chartData, onScoreUpdate }: ChartAnalysisProps) => {
+const ChartAnalysis = ({ ticker, chartData, onScoreUpdate, hidden }: ChartAnalysisProps & { hidden?: boolean }) => {
   const [analyses, setAnalyses] = useState<Partial<Record<AnalysisType, any>>>({});
   const [loading, setLoading] = useState<AnalysisType | null>(null);
   const [openSections, setOpenSections] = useState<Partial<Record<AnalysisType, boolean>>>({});
+  const [autoFetchQueue, setAutoFetchQueue] = useState<AnalysisType[]>(["candlestick", "forca", "suporte_resistencia"]);
 
   // Bubble scores up whenever analyses change
   useEffect(() => {
@@ -560,18 +561,35 @@ const ChartAnalysis = ({ ticker, chartData, onScoreUpdate }: ChartAnalysisProps)
 
       if (error) throw error;
       if (data?.error) {
-        toast({ title: "Erro na análise", description: data.error, variant: "destructive" });
+        if (!hidden) {
+          toast({ title: "Erro na análise", description: data.error, variant: "destructive" });
+        }
         return;
       }
 
       setAnalyses((prev) => ({ ...prev, [type]: data.analysis }));
     } catch (err) {
       console.error("Chart analysis error:", err);
-      toast({ title: "Erro na análise", description: "Tente novamente.", variant: "destructive" });
+      if (!hidden) {
+        toast({ title: "Erro na análise", description: "Tente novamente.", variant: "destructive" });
+      }
     } finally {
       setLoading(null);
     }
   };
+
+  // Auto-fetch analyses sequentially on mount to get scores
+  useEffect(() => {
+    if (autoFetchQueue.length === 0 || loading) return;
+    const next = autoFetchQueue[0];
+    if (!analyses[next]) {
+      requestAnalysis(next).then(() => {
+        setAutoFetchQueue((q) => q.slice(1));
+      });
+    } else {
+      setAutoFetchQueue((q) => q.slice(1));
+    }
+  }, [autoFetchQueue, loading, analyses]);
 
   const handleToggle = (type: AnalysisType) => {
     setOpenSections((prev) => ({ ...prev, [type]: !prev[type] }));
