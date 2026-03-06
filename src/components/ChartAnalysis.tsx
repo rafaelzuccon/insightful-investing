@@ -598,6 +598,8 @@ const ChartAnalysis = ({ ticker, chartData, onScoreUpdate, hidden }: ChartAnalys
     }
   };
 
+  if (hidden) return null;
+
   return (
     <div className="space-y-2">
       <h4 className="text-sm font-semibold flex items-center gap-2 mb-3">
