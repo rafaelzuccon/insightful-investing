@@ -275,7 +275,28 @@ serve(async (req) => {
       throw new Error("AI gateway error");
     }
 
-    const data = await response.json();
+    const rawText = await response.text();
+    let data: any;
+    try {
+      data = JSON.parse(rawText);
+    } catch {
+      // Try to recover truncated JSON
+      const lastBrace = rawText.lastIndexOf("}");
+      if (lastBrace > 0) {
+        try {
+          data = JSON.parse(rawText.substring(0, lastBrace + 1) + "]}]}");
+        } catch {
+          try {
+            data = JSON.parse(rawText.substring(0, lastBrace + 1));
+          } catch {
+            console.error("Cannot parse AI response, length:", rawText.length);
+            throw new Error("Resposta da IA truncada. Tente novamente.");
+          }
+        }
+      } else {
+        throw new Error("Resposta da IA inválida.");
+      }
+    }
     
     // Extract structured data from tool call
     const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
@@ -285,7 +306,13 @@ serve(async (req) => {
       try {
         analysis = JSON.parse(toolCall.function.arguments);
       } catch {
-        analysis = null;
+        // Try recovery on tool call arguments too
+        const args = toolCall.function.arguments;
+        const lb = args.lastIndexOf("}");
+        if (lb > 0) {
+          try { analysis = JSON.parse(args.substring(0, lb + 1)); } catch { analysis = null; }
+        }
+        if (!analysis) analysis = null;
       }
     }
     
