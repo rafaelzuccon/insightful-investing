@@ -222,12 +222,16 @@ serve(async (req) => {
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
+    // Limit chart data to last 30 candles to avoid token overflow
+    const limitedData = Array.isArray(chartData) ? chartData.slice(-30) : chartData;
+
     const systemPrompt = `Você é um analista técnico de ações da B3. Seja conciso e direto. Analise apenas os dados fornecidos.`;
 
+    const chartDataStr = JSON.stringify(limitedData);
     const prompts: Record<string, string> = {
-      candlestick: `Identifique 3-5 padrões de candlestick nos dados de ${ticker}, classificando cada um como BULLISH (alta) ou BEARISH (baixa). Inclua a data exata (DD/MM) onde cada padrão aparece. Identifique padrões como: Hammer, Inverted Hammer, Engulfing (bullish/bearish), Doji, Morning/Evening Star, Shooting Star, Hanging Man, Three White Soldiers, Three Black Crows, etc. Dados: ${JSON.stringify(chartData)}`,
-      forca: `Analise os candles de força (corpo grande, volume, momentum) nos dados de ${ticker}. Dados: ${JSON.stringify(chartData)}`,
-      suporte_resistencia: `Faça uma análise completa de Suporte e Resistência para ${ticker}, incluindo: 1) Níveis tradicionais de S&R, 2) Retração de Fibonacci (identifique swing high/low e calcule os níveis 0.236, 0.382, 0.5, 0.618, 0.786), 3) Bandas de Bollinger (SMA 20, 2 desvios - posição do preço, largura das bandas), 4) Análise de Volume Financeiro (zonas de alto volume que confirmam S&R). Dados: ${JSON.stringify(chartData)}`,
+      candlestick: `Identifique 3-5 padrões de candlestick nos dados de ${ticker}, classificando cada um como BULLISH (alta) ou BEARISH (baixa). Inclua a data exata (DD/MM) onde cada padrão aparece. Dados: ${chartDataStr}`,
+      forca: `Analise os candles de força (corpo grande, volume, momentum) nos dados de ${ticker}. Dados: ${chartDataStr}`,
+      suporte_resistencia: `Faça uma análise completa de Suporte e Resistência para ${ticker}, incluindo: 1) Níveis tradicionais de S&R, 2) Retração de Fibonacci, 3) Bandas de Bollinger, 4) Análise de Volume Financeiro. Dados: ${chartDataStr}`,
     };
 
     const userPrompt = prompts[analysisType];
